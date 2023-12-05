@@ -37,10 +37,13 @@ public static class MSBuildPropertyParser {
             }
         }
         
-        void ParseKey() {
-            while (TryConsume(out var c) && c != '=') {
+        bool ParseKey() {
+            char? c;
+            while (TryConsume(out c) && c != '=') {
                 currentKey.Append(c);
             }
+
+            return c is not null;
         }
 
         void ParseQuotedValue() {
@@ -91,9 +94,17 @@ public static class MSBuildPropertyParser {
         }
 
         (string key, string value) ParseKeyValue() {
-            ParseKey();
-            ParseValue();
-            return EmitAndReset();
+            if (ParseKey())
+            {
+                ParseValue();
+                return EmitAndReset();
+            }
+            else
+            {
+                var key = currentKey.ToString();
+                currentKey.Clear();
+                return (key, null);
+            }
         }
 
         bool AtEnd() => currentPos == input.Length;
