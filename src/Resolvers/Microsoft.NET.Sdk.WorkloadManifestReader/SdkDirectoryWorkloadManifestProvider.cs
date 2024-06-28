@@ -26,6 +26,7 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
         private WorkloadSet? _workloadSet;
         private WorkloadSet? _manifestsFromInstallState;
         private string? _installStateFilePath;
+        private bool _useManifestsFromInstallState = true;
 
         //  This will be non-null if there is an error loading manifests that should be thrown when they need to be accessed.
         //  We delay throwing the error so that in the case where global.json specifies a workload set that isn't installed,
@@ -120,10 +121,12 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
             _workloadSet = null;
             _manifestsFromInstallState = null;
             _installStateFilePath = null;
+            _useManifestsFromInstallState = true;
             var availableWorkloadSets = GetAvailableWorkloadSets();
 
             if (_workloadSetVersionFromConstructor != null)
             {
+                _useManifestsFromInstallState = false;
                 if (!availableWorkloadSets.TryGetValue(_workloadSetVersionFromConstructor, out _workloadSet))
                 {
                     throw new FileNotFoundException(string.Format(Strings.WorkloadVersionNotFound, _workloadSetVersionFromConstructor));
@@ -135,6 +138,7 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
                 _globalJsonWorkloadSetVersion = GlobalJsonReader.GetWorkloadVersionFromGlobalJson(_globalJsonPathFromConstructor);
                 if (_globalJsonWorkloadSetVersion != null)
                 {
+                    _useManifestsFromInstallState = false;
                     if (!availableWorkloadSets.TryGetValue(_globalJsonWorkloadSetVersion, out _workloadSet))
                     {
                         _exceptionToThrow = new FileNotFoundException(string.Format(Strings.WorkloadVersionFromGlobalJsonNotFound, _globalJsonWorkloadSetVersion, _globalJsonPathFromConstructor));
@@ -166,9 +170,36 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
 
             if (_workloadSet == null && availableWorkloadSets.Any())
             {
-                var maxWorkloadSetVersion = availableWorkloadSets.Keys.Select(k => new ReleaseVersion(k)).Max()!;
+                var maxWorkloadSetVersion = availableWorkloadSets.Keys.Aggregate((s1, s2) => VersionCompare(s1, s2) >= 0 ? s1 : s2);
                 _workloadSet = availableWorkloadSets[maxWorkloadSetVersion.ToString()];
             }
+        }
+
+        private static int VersionCompare(string first, string second)
+        {
+            if (first.Equals(second))
+            {
+                return 0;
+            }
+
+            var firstDash = first.IndexOf('-');
+            var secondDash = second.IndexOf('-');
+            firstDash = firstDash < 0 ? first.Length : firstDash;
+            secondDash = secondDash < 0 ? second.Length : secondDash;
+
+            var firstVersion = new Version(first.Substring(0, firstDash));
+            var secondVersion = new Version(second.Substring(0, secondDash));
+
+            var comparison = firstVersion.CompareTo(secondVersion);
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+
+            var modifiedFirst = "1.1.1" + (firstDash == first.Length ? string.Empty : first.Substring(firstDash));
+            var modifiedSecond = "1.1.1" + (secondDash == second.Length ? string.Empty : second.Substring(secondDash));
+
+            return new ReleaseVersion(modifiedFirst).CompareTo(new ReleaseVersion(modifiedSecond));
         }
 
         void ThrowExceptionIfManifestsNotAvailable()
@@ -236,10 +267,10 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
 
             void ProbeDirectory(string manifestDirectory, string featureBand)
             {
-                (string? id, string? finalManifestDirectory, ReleaseVersion? version) = ResolveManifestDirectory(manifestDirectory);
+                (string? id, string? finalManifestDirectory, string? version) = ResolveManifestDirectory(manifestDirectory);
                 if (id != null && finalManifestDirectory != null)
                 {
-                    AddManifest(id, finalManifestDirectory, featureBand, version?.ToString() ?? Path.GetFileName(manifestDirectory));
+                    AddManifest(id, finalManifestDirectory, featureBand, version ?? Path.GetFileName(manifestDirectory));
                 }
             }
 
@@ -289,28 +320,30 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
                         throw new FileNotFoundException(string.Format(Strings.ManifestFromWorkloadSetNotFound, manifestSpecifier.ToString(), _workloadSet.Version));
                     }
                     AddManifest(manifestSpecifier.Id.ToString(), manifestDirectory, manifestSpecifier.FeatureBand.ToString(), kvp.Value.Version.ToString());
-                    
                 }
             }
 
-            //  Load manifests from install state
-            if (_manifestsFromInstallState != null)
+            if (_useManifestsFromInstallState)
             {
-                foreach (var kvp in _manifestsFromInstallState.ManifestVersions)
+                //  Load manifests from install state
+                if (_manifestsFromInstallState != null)
                 {
-                    var manifestSpecifier = new ManifestSpecifier(kvp.Key, kvp.Value.Version, kvp.Value.FeatureBand);
-                    var manifestDirectory = GetManifestDirectoryFromSpecifier(manifestSpecifier);
-                    if (manifestDirectory == null)
+                    foreach (var kvp in _manifestsFromInstallState.ManifestVersions)
                     {
-                        throw new FileNotFoundException(string.Format(Strings.ManifestFromInstallStateNotFound, manifestSpecifier.ToString(), _installStateFilePath));
+                        var manifestSpecifier = new ManifestSpecifier(kvp.Key, kvp.Value.Version, kvp.Value.FeatureBand);
+                        var manifestDirectory = GetManifestDirectoryFromSpecifier(manifestSpecifier);
+                        if (manifestDirectory == null)
+                        {
+                            throw new FileNotFoundException(string.Format(Strings.ManifestFromInstallStateNotFound, manifestSpecifier.ToString(), _installStateFilePath));
+                        }
+                        AddManifest(manifestSpecifier.Id.ToString(), manifestDirectory, manifestSpecifier.FeatureBand.ToString(), kvp.Value.Version.ToString());
                     }
-                    AddManifest(manifestSpecifier.Id.ToString(), manifestDirectory, manifestSpecifier.FeatureBand.ToString(), kvp.Value.Version.ToString());
                 }
             }
 
-            if (_knownManifestIdsAndOrder != null && _knownManifestIdsAndOrder.Keys.Any(id => !manifestIdsToManifests.ContainsKey(id)))
+            var missingManifestIds = _knownManifestIdsAndOrder?.Keys.Where(id => !manifestIdsToManifests.ContainsKey(id));
+            if (missingManifestIds != null && missingManifestIds.Any())
             {
-                var missingManifestIds = _knownManifestIdsAndOrder.Keys.Where(id => !manifestIdsToManifests.ContainsKey(id));
                 foreach (var missingManifestId in missingManifestIds)
                 {
                     var (manifestDir, featureBand) = FallbackForMissingManifest(missingManifestId);
@@ -321,7 +354,7 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
                 }
             }
 
-            //  Return manifests in a stable order.  Manifests in the KnownWorkloadManifests.txt file will be first, and in the same order they appear in that file.
+            //  Return manifests in a stable order. Manifests in the KnownWorkloadManifests.txt file will be first, and in the same order they appear in that file.
             //  Then the rest of the manifests (if any) will be returned in (ordinal case-insensitive) alphabetical order.
             return manifestIdsToManifests
                 .OrderBy(kvp =>
@@ -342,7 +375,7 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
         /// Given a folder that may directly include a WorkloadManifest.json file, or may have the workload manifests in version subfolders, choose the directory
         /// with the latest workload manifest.
         /// </summary>
-        private (string? id, string? manifestDirectory, ReleaseVersion? version) ResolveManifestDirectory(string manifestDirectory)
+        private (string? id, string? manifestDirectory, string? version) ResolveManifestDirectory(string manifestDirectory)
         {
             string manifestId = Path.GetFileName(manifestDirectory);
             if (_outdatedManifestIds.Contains(manifestId) ||
@@ -355,18 +388,14 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
                     .Where(dir => File.Exists(Path.Combine(dir, "WorkloadManifest.json")))
                     .Select(dir =>
                     {
-                        ReleaseVersion? releaseVersion = null;
-                        ReleaseVersion.TryParse(Path.GetFileName(dir), out releaseVersion);
-                        return (directory: dir, version: releaseVersion);
-                    })
-                    .Where(t => t.version != null)
-                    .OrderByDescending(t => t.version)
-                    .ToList();
+                        return (directory: dir, version: Path.GetFileName(dir));
+                    });
 
             //  Assume that if there are any versioned subfolders, they are higher manifest versions than a workload manifest directly in the specified folder, if it exists
             if (manifestVersionDirectories.Any())
             {
-                return (manifestId, manifestVersionDirectories.First().directory, manifestVersionDirectories.First().version);
+                var maxVersionDirectory = manifestVersionDirectories.Aggregate((d1, d2) => VersionCompare(d1.version, d2.version) > 0 ? d1 : d2);
+                return (manifestId, maxVersionDirectory.directory, maxVersionDirectory.version);
             }
             else if (File.Exists(Path.Combine(manifestDirectory, "WorkloadManifest.json")))
             {
@@ -374,7 +403,7 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
                 try
                 {
                     var manifestContents = WorkloadManifestReader.ReadWorkloadManifest(manifestId, File.OpenRead(manifestPath), manifestPath);
-                    return (manifestId, manifestDirectory, new ReleaseVersion(manifestContents.Version));
+                    return (manifestId, manifestDirectory, manifestContents.Version);
                 }
                 catch
                 { }
