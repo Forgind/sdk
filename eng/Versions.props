@@ -79,6 +79,7 @@
     <SystemSecurityPermissionsPackageVersion>8.0.0</SystemSecurityPermissionsPackageVersion>
     <SystemServiceProcessServiceControllerVersion>8.0.0</SystemServiceProcessServiceControllerVersion>
     <SystemTextJsonPackageVersion>8.0.3</SystemTextJsonPackageVersion>
+    <SystemTextJsonBasePackageVersion>8.0.0</SystemTextJsonBasePackageVersion>
     <SystemWindowsExtensionsPackageVersion>8.0.0</SystemWindowsExtensionsPackageVersion>
   </PropertyGroup>
   <PropertyGroup>
