@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.CommandLine;
-using Microsoft.Deployment.DotNet.Releases;
 using Microsoft.DotNet.Cli;
 using Microsoft.DotNet.Cli.Utils;
 using Microsoft.DotNet.Workloads.Workload.Install;
@@ -13,7 +12,6 @@ namespace Microsoft.DotNet.Workloads.Workload.Search
     internal class WorkloadSearchCommand : WorkloadCommandBase
     {
         private readonly IWorkloadResolver _workloadResolver;
-        private readonly ReleaseVersion _sdkVersion;
         private readonly string _workloadIdStub;
 
         public WorkloadSearchCommand(
@@ -23,7 +21,7 @@ namespace Microsoft.DotNet.Workloads.Workload.Search
         {
             _workloadIdStub = result.GetValue(WorkloadSearchCommandParser.WorkloadIdStubArgument);
 
-            workloadResolverFactory = workloadResolverFactory ?? new WorkloadResolverFactory();
+            workloadResolverFactory ??= new WorkloadResolverFactory();
 
             if (!string.IsNullOrEmpty(result.GetValue(WorkloadSearchCommandParser.VersionOption)))
             {
@@ -32,7 +30,6 @@ namespace Microsoft.DotNet.Workloads.Workload.Search
 
             var creationResult = workloadResolverFactory.Create();
 
-            _sdkVersion = creationResult.SdkVersion;
             _workloadResolver = creationResult.WorkloadResolver;
         }
 
