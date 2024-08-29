@@ -60,8 +60,8 @@ namespace Microsoft.DotNet.Cli
 
             var result = Parser.Instance.Parse(input);
 
-            return result.GetCompletions(position)
-                .Distinct()
+            var completions = result.GetCompletions(position);
+            return completions.Distinct()
                 .ToArray();
         }
     }

@@ -2,7 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.CommandLine;
-using Microsoft.DotNet.Workloads.Workload.Search;
+using Microsoft.DotNet.Workloads.Workload.Search.Versions;
 using LocalizableStrings = Microsoft.DotNet.Workloads.Workload.Search.LocalizableStrings;
 
 namespace Microsoft.DotNet.Cli
@@ -11,7 +11,7 @@ namespace Microsoft.DotNet.Cli
     {
         public static readonly CliOption<int> TakeOption = new("--take") { DefaultValueFactory = (_) => 5 };
 
-        public static readonly CliOption<string> FormatOption = new("--format")
+        public static readonly CliOption<SearchWorkloadSetsFormat> FormatOption = new("--format")
         {
             Description = LocalizableStrings.FormatOptionDescription
         };
@@ -37,12 +37,15 @@ namespace Microsoft.DotNet.Cli
                 }
             });
 
-            command.SetAction(parseResult => new WorkloadSearchCommand(parseResult)
-            {
-                ListWorkloadSetVersions = true
-            }.Execute());
+            command.SetAction((parseResult, ct) => new SearchWorkloadSetsCommand(parseResult).Execute(ct));
 
             return command;
         }
+    }
+
+    internal enum SearchWorkloadSetsFormat
+    {
+        list,
+        json
     }
 }

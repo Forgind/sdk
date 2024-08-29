@@ -214,7 +214,7 @@ namespace Microsoft.DotNet.Workloads.Workload
                 }
             }
 
-            string resolvedWorkloadSetVersion = _workloadSetVersionFromGlobalJson ??_workloadSetVersionFromCommandLine;
+            string resolvedWorkloadSetVersion = _workloadSetVersionFromGlobalJson ?? _workloadSetVersionFromCommandLine;
             if (string.IsNullOrWhiteSpace(resolvedWorkloadSetVersion) && !UseRollback && !FromHistory)
             {
                 _workloadManifestUpdater.UpdateAdvertisingManifestsAsync(_includePreviews, updateToLatestWorkloadSet, offlineCache).Wait();
@@ -423,10 +423,14 @@ namespace Microsoft.DotNet.Workloads.Workload
 
     internal static class InstallingWorkloadCommandParser
     {
-        public static readonly CliOption<string> WorkloadSetVersionOption = new("--version")
+        public static readonly CliOption<string> WorkloadSetVersionOption = new CliOption<string>("--version")
         {
             Description = Strings.WorkloadSetVersionOptionDescription
-        };
+        }.AddCompletions((ctx) =>
+        {
+            var versions = Search.Versions.SearchWorkloadSetsCommand.GetWorkloadSetVersions(ctx).GetAwaiter().GetResult();
+            return versions.Select(v => new System.CommandLine.Completions.CompletionItem(v));
+        });
 
         public static readonly CliOption<bool> PrintDownloadLinkOnlyOption = new("--print-download-link-only")
         {
