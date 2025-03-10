@@ -46,6 +46,7 @@ namespace Microsoft.DotNet.Workloads.Workload
         protected readonly IWorkloadManifestUpdater _workloadManifestUpdaterFromConstructor;
         protected IInstaller _workloadInstaller;
         protected IWorkloadManifestUpdater _workloadManifestUpdater;
+        protected bool? _shouldUseWorkloadSets;
         private WorkloadHistoryState _workloadHistoryRecord;
 
         protected bool UseRollback => !string.IsNullOrWhiteSpace(_fromRollbackDefinition);
@@ -131,7 +132,7 @@ namespace Microsoft.DotNet.Workloads.Workload
             _workloadManifestUpdaterFromConstructor = workloadManifestUpdater;
 
             _globalJsonPath = SdkDirectoryWorkloadManifestProvider.GetGlobalJsonPath(Environment.CurrentDirectory);
-            _workloadSetVersionFromGlobalJson = SdkDirectoryWorkloadManifestProvider.GlobalJsonReader.GetWorkloadVersionFromGlobalJson(_globalJsonPath);
+            _workloadSetVersionFromGlobalJson = SdkDirectoryWorkloadManifestProvider.GlobalJsonReader.GetWorkloadVersionFromGlobalJson(_globalJsonPath, out _shouldUseWorkloadSets);
 
             if (SpecifiedWorkloadSetVersionInGlobalJson && (SpecifiedWorkloadSetVersionOnCommandLine || UseRollback || FromHistory))
             {
@@ -149,6 +150,15 @@ namespace Microsoft.DotNet.Workloads.Workload
                     InstallingWorkloadCommandParser.WorkloadSetVersionOption.Name,
                     WorkloadUpdateCommandParser.FromHistoryOption.Name), isUserError: true);
             }
+            else if (_shouldUseWorkloadSets == true && (UseRollback || (FromHistory && _WorkloadHistoryRecord.WorkloadSetVersion is null)))
+            {
+                // TODO: This and the next should be fixed
+                throw new GracefulException(Update.LocalizableStrings.SpecifiedWorkloadVersionAndSpecificNonWorkloadVersion, isUserError: true);
+            }
+            else if (_shouldUseWorkloadSets == false && (SpecifiedWorkloadSetVersionInGlobalJson || SpecifiedWorkloadSetVersionOnCommandLine || (FromHistory && _WorkloadHistoryRecord.WorkloadSetVersion is not null)))
+            {
+                throw new GracefulException(Update.LocalizableStrings.SpecifiedNoWorkloadVersionAndSpecificWorkloadVersion, isUserError: true);
+            }
 
             //  At this point, at most one of SpecifiedWorkloadSetVersionOnCommandLine, UseRollback, FromHistory, and SpecifiedWorkloadSetVersionInGlobalJson is true
         }
@@ -160,23 +170,19 @@ namespace Microsoft.DotNet.Workloads.Workload
 
         InstallStateContents GetCurrentInstallState()
         {
-            return GetCurrentInstallState(_sdkFeatureBand, _workloadRootDir);
-        }
-
-        static InstallStateContents GetCurrentInstallState(SdkFeatureBand sdkFeatureBand, string dotnetDir)
-        {
-            string path = Path.Combine(WorkloadInstallType.GetInstallStateFolder(sdkFeatureBand, dotnetDir), "default.json");
+            string path = Path.Combine(WorkloadInstallType.GetInstallStateFolder(_sdkFeatureBand, _workloadRootDir), "default.json");
             return InstallStateContents.FromPath(path);
         }
 
         public static bool ShouldUseWorkloadSetMode(SdkFeatureBand sdkFeatureBand, string dotnetDir)
         {
-            return GetCurrentInstallState(sdkFeatureBand, dotnetDir).ShouldUseWorkloadSets();
+            return WorkloadManifestUpdater.ShouldUseWorkloadSetMode(sdkFeatureBand, dotnetDir);
         }
 
         protected void UpdateWorkloadManifests(WorkloadHistoryRecorder recorder, ITransactionContext context, DirectoryPath? offlineCache)
         {
-            var updateToLatestWorkloadSet = ShouldUseWorkloadSetMode(_sdkFeatureBand, _workloadRootDir) && !SpecifiedWorkloadSetVersionInGlobalJson;
+            var shouldUseWorkloadSetsPerInstallState = ShouldUseWorkloadSetMode(_sdkFeatureBand, _workloadRootDir);
+            var updateToLatestWorkloadSet =  _shouldUseWorkloadSets ?? shouldUseWorkloadSetsPerInstallState && !SpecifiedWorkloadSetVersionInGlobalJson;
             if (FromHistory && !string.IsNullOrWhiteSpace(_WorkloadHistoryRecord.WorkloadSetVersion))
             {
                 // This is essentially the same as updating to a specific workload set version, and we're now past the error check,

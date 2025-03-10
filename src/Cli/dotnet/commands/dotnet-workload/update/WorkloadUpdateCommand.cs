@@ -97,9 +97,10 @@ namespace Microsoft.DotNet.Workloads.Workload.Update
             }
             else if (_adManifestOnlyOption)
             {
+                bool? shouldUseWorkloadSetsPerGlobalJson = _shouldUseWorkloadSets ?? SpecifiedWorkloadSetVersionInGlobalJson ? true : null;
                 _workloadManifestUpdater.UpdateAdvertisingManifestsAsync(
                     _includePreviews,
-                    ShouldUseWorkloadSetMode(_sdkFeatureBand, _workloadRootDir),
+                    shouldUseWorkloadSetsPerGlobalJson ?? ShouldUseWorkloadSetMode(_sdkFeatureBand, _workloadRootDir),
                     string.IsNullOrWhiteSpace(_fromCacheOption) ?
                         null :
                         new DirectoryPath(_fromCacheOption))

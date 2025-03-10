@@ -108,7 +108,7 @@ namespace Microsoft.DotNet.Workloads.Workload
         {
             try
             {
-                return SdkDirectoryWorkloadManifestProvider.GlobalJsonReader.GetWorkloadVersionFromGlobalJson(globalJsonPath);
+                return SdkDirectoryWorkloadManifestProvider.GlobalJsonReader.GetWorkloadVersionFromGlobalJson(globalJsonPath, out _);
             }
             catch (SdkDirectoryWorkloadManifestProvider.JsonFormatException)
             {

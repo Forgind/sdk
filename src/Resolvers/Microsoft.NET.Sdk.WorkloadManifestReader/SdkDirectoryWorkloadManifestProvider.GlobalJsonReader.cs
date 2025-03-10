@@ -12,8 +12,9 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
     {
         public static class GlobalJsonReader
         {
-            public static string? GetWorkloadVersionFromGlobalJson(string? globalJsonPath)
+            public static string? GetWorkloadVersionFromGlobalJson(string? globalJsonPath, out bool? shouldUseWorkloadSets)
             {
+                shouldUseWorkloadSets = null;
                 if (string.IsNullOrEmpty(globalJsonPath))
                 {
                     return null;
@@ -51,6 +52,14 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
                                             if (string.Equals("workloadVersion", sdkPropName, StringComparison.OrdinalIgnoreCase))
                                             {
                                                 workloadVersion = JsonReader.ReadString(ref reader);
+                                            }
+                                            else if (string.Equals("useWorkloadVersions", sdkPropName, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                // shouldUseWorkloadSets cannot be passed directly into TryParse because bool? != bool
+                                                if (bool.TryParse(JsonReader.ReadString(ref reader), out bool parsedBool))
+                                                {
+                                                    shouldUseWorkloadSets = parsedBool;
+                                                }
                                             }
                                             else
                                             {
