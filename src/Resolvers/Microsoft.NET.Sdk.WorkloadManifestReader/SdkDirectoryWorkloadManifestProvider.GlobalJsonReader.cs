@@ -1,4 +1,4 @@
-﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
+// Copyright (c) .NET Foundation and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.NET.Sdk.Localization;
@@ -53,13 +53,12 @@ namespace Microsoft.NET.Sdk.WorkloadManifestReader
                                             {
                                                 workloadVersion = JsonReader.ReadString(ref reader);
                                             }
-                                            else if (string.Equals("useWorkloadVersions", sdkPropName, StringComparison.OrdinalIgnoreCase))
+                                            else if (string.Equals("workloads-update-mode", sdkPropName, StringComparison.OrdinalIgnoreCase))
                                             {
-                                                // shouldUseWorkloadSets cannot be passed directly into TryParse because bool? != bool
-                                                if (bool.TryParse(JsonReader.ReadString(ref reader), out bool parsedBool))
-                                                {
-                                                    shouldUseWorkloadSets = parsedBool;
-                                                }
+                                                var useWorkloadSetsString = JsonReader.ReadString(ref reader);
+                                                shouldUseWorkloadSets = "workload-set".Equals(useWorkloadSetsString, StringComparison.OrdinalIgnoreCase) ? true :
+                                                                        "manifests".Equals(useWorkloadSetsString, StringComparison.OrdinalIgnoreCase) ? false :
+                                                                        shouldUseWorkloadSets;
                                             }
                                             else
                                             {
