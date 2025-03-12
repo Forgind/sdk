@@ -33,10 +33,11 @@ namespace Microsoft.DotNet.Workloads.Workload.Update
             IWorkloadManifestUpdater workloadManifestUpdater = null,
             string tempDirPath = null,
             bool isRestoring = false,
-            WorkloadHistoryRecorder recorder = null)
+            WorkloadHistoryRecorder recorder = null,
+            bool? shouldUseWorkloadSetsFromGlobalJson = null)
             : base(parseResult, reporter: reporter, workloadResolverFactory: workloadResolverFactory, workloadInstaller: workloadInstaller,
                   nugetPackageDownloader: nugetPackageDownloader, workloadManifestUpdater: workloadManifestUpdater,
-                  tempDirPath: tempDirPath)
+                  tempDirPath: tempDirPath, shouldUseWorkloadSetsFromGlobalJson: shouldUseWorkloadSetsFromGlobalJson)
 
         {
             

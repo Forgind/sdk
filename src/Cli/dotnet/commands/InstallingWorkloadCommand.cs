@@ -86,7 +86,8 @@ namespace Microsoft.DotNet.Workloads.Workload
             IInstaller workloadInstaller,
             INuGetPackageDownloader nugetPackageDownloader,
             IWorkloadManifestUpdater workloadManifestUpdater,
-            string tempDirPath)
+            string tempDirPath,
+            bool? shouldUseWorkloadSetsFromGlobalJson = null)
             : base(parseResult, reporter: reporter, tempDirPath: tempDirPath, nugetPackageDownloader: nugetPackageDownloader)
         {
             _arguments = parseResult.GetArguments();
@@ -133,6 +134,7 @@ namespace Microsoft.DotNet.Workloads.Workload
 
             _globalJsonPath = SdkDirectoryWorkloadManifestProvider.GetGlobalJsonPath(Environment.CurrentDirectory);
             _workloadSetVersionFromGlobalJson = SdkDirectoryWorkloadManifestProvider.GlobalJsonReader.GetWorkloadVersionFromGlobalJson(_globalJsonPath, out _shouldUseWorkloadSets);
+            _shouldUseWorkloadSets = shouldUseWorkloadSetsFromGlobalJson ?? _shouldUseWorkloadSets;
 
             if (SpecifiedWorkloadSetVersionInGlobalJson && (SpecifiedWorkloadSetVersionOnCommandLine || UseRollback || FromHistory))
             {
@@ -215,7 +217,7 @@ namespace Microsoft.DotNet.Workloads.Workload
                     _workloadInstaller.UpdateInstallMode(_sdkFeatureBand, true);
                 }
 
-                if (_workloadSetVersionFromCommandLine?.Any(v => v.Contains('@')) == true)
+                if (_workloadSetVersionFromCommandLine.Any(v => v.Contains('@')))
                 {
                     var versions = WorkloadSearchVersionsCommand.FindBestWorkloadSetsFromComponents(
                         _sdkFeatureBand,
@@ -275,9 +277,9 @@ namespace Microsoft.DotNet.Workloads.Workload
 
             IEnumerable<ManifestVersionUpdate> manifestsToUpdate =
                 resolvedWorkloadSetVersion != null ? InstallWorkloadSet(context, resolvedWorkloadSetVersion) :
-                UseRollback ? _workloadManifestUpdater.CalculateManifestRollbacks(_fromRollbackDefinition, recorder) :
-                FromHistory ? _workloadManifestUpdater.CalculateManifestUpdatesFromHistory(_WorkloadHistoryRecord) :
-                              _workloadManifestUpdater.CalculateManifestUpdates().Select(m => m.ManifestUpdate);
+                                       UseRollback ? _workloadManifestUpdater.CalculateManifestRollbacks(_fromRollbackDefinition, recorder) :
+                                       FromHistory ? _workloadManifestUpdater.CalculateManifestUpdatesFromHistory(_WorkloadHistoryRecord) :
+                                                     _workloadManifestUpdater.CalculateManifestUpdates().Select(m => m.ManifestUpdate);
 
             InstallStateContents oldInstallState = GetCurrentInstallState();
 
