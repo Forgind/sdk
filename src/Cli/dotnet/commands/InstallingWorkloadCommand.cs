@@ -197,6 +197,12 @@ namespace Microsoft.DotNet.Workloads.Workload
                 updateToLatestWorkloadSet = false;
             }
 
+            string resolvedWorkloadSetVersion = _workloadSetVersionFromGlobalJson;
+            if (SpecifiedWorkloadSetVersionInGlobalJson && recorder is not null)
+            {
+                recorder.HistoryRecord.GlobalJsonVersion = _workloadSetVersionFromGlobalJson;
+            }
+
             if (SpecifiedWorkloadSetVersionOnCommandLine)
             {
                 updateToLatestWorkloadSet = false;
@@ -209,45 +215,37 @@ namespace Microsoft.DotNet.Workloads.Workload
                     _workloadInstaller.UpdateInstallMode(_sdkFeatureBand, true);
                 }
 
-                if (SpecifiedWorkloadSetVersionInGlobalJson && recorder is not null)
+                if (_workloadSetVersionFromCommandLine?.Any(v => v.Contains('@')) == true)
                 {
-                    recorder.HistoryRecord.GlobalJsonVersion = _workloadSetVersionFromGlobalJson;
-                }
-            }
+                    var versions = WorkloadSearchVersionsCommand.FindBestWorkloadSetsFromComponents(
+                        _sdkFeatureBand,
+                        _workloadInstaller is not NetSdkMsiInstallerClient ? _workloadInstaller : null,
+                        _sdkFeatureBand.IsPrerelease,
+                        PackageDownloader,
+                        _workloadSetVersionFromCommandLine,
+                        _workloadResolver,
+                        numberOfWorkloadSetsToTake: 1);
 
-            string resolvedWorkloadSetVersion = null;
-
-            if (_workloadSetVersionFromCommandLine?.Any(v => v.Contains('@')) == true)
-            {
-                var versions = WorkloadSearchVersionsCommand.FindBestWorkloadSetsFromComponents(
-                    _sdkFeatureBand,
-                    _workloadInstaller is not NetSdkMsiInstallerClient ? _workloadInstaller : null,
-                    _sdkFeatureBand.IsPrerelease,
-                    PackageDownloader,
-                    _workloadSetVersionFromCommandLine,
-                    _workloadResolver,
-                    numberOfWorkloadSetsToTake: 1);
-
-                if (versions is null)
-                {
-                    return;
-                }
-                else if (!versions.Any())
-                {
-                    Reporter.WriteLine(Update.LocalizableStrings.NoWorkloadUpdateFound);
-                    return;
+                    if (versions is null)
+                    {
+                        return;
+                    }
+                    else if (!versions.Any())
+                    {
+                        Reporter.WriteLine(Update.LocalizableStrings.NoWorkloadUpdateFound);
+                        return;
+                    }
+                    else
+                    {
+                        resolvedWorkloadSetVersion = versions.Single();
+                    }
                 }
                 else
                 {
-                    resolvedWorkloadSetVersion = versions.Single();
+                    resolvedWorkloadSetVersion = _workloadSetVersionFromCommandLine.Single();
                 }
             }
-            else if (SpecifiedWorkloadSetVersionOnCommandLine)
-            {
-                resolvedWorkloadSetVersion = _workloadSetVersionFromCommandLine.Single();
-            }
 
-            resolvedWorkloadSetVersion = _workloadSetVersionFromGlobalJson ?? resolvedWorkloadSetVersion;
             if (string.IsNullOrWhiteSpace(resolvedWorkloadSetVersion) && !UseRollback && !FromHistory)
             {
                 _workloadManifestUpdater.UpdateAdvertisingManifestsAsync(_includePreviews, updateToLatestWorkloadSet, offlineCache).Wait();
@@ -275,17 +273,11 @@ namespace Microsoft.DotNet.Workloads.Workload
                 return;
             }
 
-            IEnumerable<ManifestVersionUpdate> manifestsToUpdate;
-            if (resolvedWorkloadSetVersion != null)
-            {
-                manifestsToUpdate = InstallWorkloadSet(context, resolvedWorkloadSetVersion);
-            }
-            else
-            {
-                manifestsToUpdate = UseRollback ? _workloadManifestUpdater.CalculateManifestRollbacks(_fromRollbackDefinition, recorder) :
-                                    FromHistory ? _workloadManifestUpdater.CalculateManifestUpdatesFromHistory(_WorkloadHistoryRecord) :
-                                                  _workloadManifestUpdater.CalculateManifestUpdates().Select(m => m.ManifestUpdate);
-            }
+            IEnumerable<ManifestVersionUpdate> manifestsToUpdate =
+                resolvedWorkloadSetVersion != null ? InstallWorkloadSet(context, resolvedWorkloadSetVersion) :
+                UseRollback ? _workloadManifestUpdater.CalculateManifestRollbacks(_fromRollbackDefinition, recorder) :
+                FromHistory ? _workloadManifestUpdater.CalculateManifestUpdatesFromHistory(_WorkloadHistoryRecord) :
+                              _workloadManifestUpdater.CalculateManifestUpdates().Select(m => m.ManifestUpdate);
 
             InstallStateContents oldInstallState = GetCurrentInstallState();
 
