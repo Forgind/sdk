@@ -98,7 +98,7 @@ namespace Microsoft.DotNet.Workloads.Workload.Update
             }
             else if (_adManifestOnlyOption)
             {
-                bool? shouldUseWorkloadSetsPerGlobalJson = _shouldUseWorkloadSets ?? SpecifiedWorkloadSetVersionInGlobalJson ? true : null;
+                bool? shouldUseWorkloadSetsPerGlobalJson = _shouldUseWorkloadSets ?? (SpecifiedWorkloadSetVersionInGlobalJson ? true : null);
                 _workloadManifestUpdater.UpdateAdvertisingManifestsAsync(
                     _includePreviews,
                     shouldUseWorkloadSetsPerGlobalJson ?? ShouldUseWorkloadSetMode(_sdkFeatureBand, _workloadRootDir),
