@@ -154,7 +154,6 @@ namespace Microsoft.DotNet.Workloads.Workload
             }
             else if (_shouldUseWorkloadSets == true && (UseRollback || (FromHistory && _WorkloadHistoryRecord.WorkloadSetVersion is null)))
             {
-                // TODO: This and the next should be fixed
                 throw new GracefulException(Update.LocalizableStrings.SpecifiedWorkloadVersionAndSpecificNonWorkloadVersion, isUserError: true);
             }
             else if (_shouldUseWorkloadSets == false && (SpecifiedWorkloadSetVersionInGlobalJson || SpecifiedWorkloadSetVersionOnCommandLine || (FromHistory && _WorkloadHistoryRecord.WorkloadSetVersion is not null)))
